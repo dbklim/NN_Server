@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from NeuralNetwork import classificate
+from NeuralNetworkAPI import classificate
 
 from PIL import Image as pilImage
 from io import BytesIO
