@@ -164,9 +164,22 @@ class LeNet:
         start_time = time.time()
 
         try:
-            # Преобразование бинарной строки в PIL
+            # Преобразование бинарной строки в PIL Image
             stream = BytesIO(recognize_image)
             recognize_image = pilImage.open(stream)
+
+            # Если изображение прямоугольное, то преобразование его в квадратное
+            width, height = recognize_image.size
+            if width > height:
+                background = pilImage.new('RGB', (width, width), (255, 255, 255))
+                background.paste(recognize_image, (0, (width - height) // 2))
+                recognize_image = background
+            elif width < height:
+                background = pilImage.new('RGB', (height, height), (255, 255, 255))
+                background.paste(recognize_image, ((height - width) // 2, 0))
+                recognize_image = background
+
+            # Преобразование изображение в чёрно-белое и уменьшение размера до 28х28
             recognize_image = recognize_image.convert('L')
             recognize_image.thumbnail((28, 28), pilImage.ANTIALIAS)
         except Exception as e:
