@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
 import socket
-import sys
 
 def create_request(part1, part2, data = None):
-        """ Объединение заголовка и тела запроса с указанием общего размера всех передаваемых данных. """
-        len_part1 = len(part1)
-        len_part2 = len(part2)
-        if data != None:
-            len_part2 += len(data)
+    """ Объединение заголовка и тела запроса с указанием общего размера всех передаваемых данных. """
+    len_part1 = len(part1)
+    len_part2 = len(part2)
+    if data != None:
+        len_part2 += len(data)
 
-        len_response = str(len_part1 + len_part2)
-        len_response = str(len_part1 + len_part2 + len(len_response))
+    len_response = str(len_part1 + len_part2)
+    len_response = str(len_part1 + len_part2 + len(len_response))
 
-        if data != None:
-            return (part1 + str(len_part1 + len_part2 + len(len_response)) + part2).encode("utf-8") + data
-        else:
-            return (part1 + str(len_part1 + len_part2 + len(len_response)) + part2).encode("utf-8")
+    if data != None:
+        return (part1 + str(len_part1 + len_part2 + len(len_response)) + part2).encode("utf-8") + data
+    else:
+        return (part1 + str(len_part1 + len_part2 + len(len_response)) + part2).encode("utf-8")
 
 def classification(host, port, type_neural_network, type_operation, image_to_classificate = None):
     """ Поддерживается два режима:
