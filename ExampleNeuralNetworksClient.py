@@ -3,14 +3,14 @@ from NeuralNetworksClient import classification
 import time
 import os
 
-number_image = input("Введите номер изображения с цифрой для распознования (0..9): ")
+number_image = input("Введите номер изображения с цифрой для распознавания (0..9): ")
 check = True
 while check == True:
     if number_image == "0" or number_image == "1" or number_image == "2" or number_image == "3" or number_image == "4" or number_image == "5" or number_image == "6" or number_image == "7" or number_image == "8" or number_image == "9":
         check = False
     else:
         print("Необходимо ввести цифру от 0 до 9!")
-        number_image = input("Введите номер изображения с цифрой для распознования (0..9): ")
+        number_image = input("Введите номер изображения с цифрой для распознавания (0..9): ")
 
 # Загрузка изображения
 img_path = number_image + ".jpg"
