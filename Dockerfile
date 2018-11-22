@@ -7,15 +7,13 @@ RUN apt-get install -y build-essential python3.5 python3.5-dev python3-pip pytho
 RUN ldconfig
 
 # Копирование файлов проекта
-COPY . /work
-WORKDIR /work
+COPY . /NN_Server
+WORKDIR /NN_Server
 
 # Установка модулей для Python3
 RUN pip3 install --upgrade pip
 RUN pip3 install tensorflow==1.7.0 decorator flask==1.0.2 flask-httpauth==3.2.4 gevent==1.3.7 h5py keras numpy pillow requests
 RUN ldconfig
-
-WORKDIR /work/NN_Server
 
 # Изменение локализации для вывода кириллицы в терминале
 RUN locale-gen en_US.UTF-8
