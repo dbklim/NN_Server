@@ -397,7 +397,7 @@ access_to_nn_server(host, port, name_nn, type_operation, login=None, password=No
 6. `password` - пароль для подключения к серверу (если не задавать, используется `lenet`)
 7. `https` - `True`, что бы включить режим https
 8. `data` - передаваемые данные для нейронной сети (например, бинарная строка с изображением)
-9. возвращает строку с ответом сервера, либо строку с ошибкой (начинается с `[E]`), либо при запросе `lenet status` - `tuple` с точностью обучения сети в % и датой последнего обучения 
+9. возвращает строку с ответом сервера, либо строку с ошибкой (начинается с `[E]`), либо `list` со списком сетей и их адресами при запросе `list_nn`, либо `tuple` с точностью обучения сети в % и датой последнего обучения при запросе `lenet status`
     
 Поддерживаемые значения для `name_nn`:
 1. `list_nn` - получить список имеющихся нейронных сетей и их адреса 
@@ -419,20 +419,20 @@ name_nn = 'lenet'
 type_operation = 'classify'
 number_image = '1'
 img_data = None
-if type_operation == 'classify': 
+if type_operation == 'classify': # Если выбрана классификация, будет загружено изображение цифры 1
     img_path = 'images/' + number_image + '.jpg'
     with open(img_path, 'rb') as f_image:
         img_data = f_image.read()
 try:
     result = access_to_nn_server('127.0.0.1', '5000', name_nn, type_operation, data=img_data)
-except requests.exceptions.RequestException as e:
+except requests.exceptions.RequestException as e: # Если возникла ошибка соединения
     print('\n[E] ' + str(e) + '\n')
     return
-if isinstance(result, tuple):
+if isinstance(result, tuple): # Если был запрос на статус сети
     print('Результат обработки запроса: точность классификации %s%%, дата последнего обучения %s' % (result[0], result[1]))
-elif isinstance(result, list):
+elif isinstance(result, list): # Если был запрос на список имеющихся сетей
     print('Результат обработки запроса: %s' % result)
-elif result.find('[E]') != -1:
+elif result.find('[E]') != -1: # Если сервер вернул ошибку либо переданы некорректные данные
     print(result)
 else:
     print('Результат запроса: ' + result)
