@@ -393,11 +393,11 @@ access_to_nn_server(host, port, name_nn, type_operation, login=None, password=No
 2. `port` - порт сервера
 3. `name_nn` - имя запрашиваемой нейронной сети
 4. `type_operation` - тип операции над сетью
-5. `login` - логин для подключения к серверу
-6. `password` - пароль для подключения к серверу
+5. `login` - логин для подключения к серверу (если не задавать, используется `test_nn`)
+6. `password` - пароль для подключения к серверу (если не задавать, используется `lenet`)
 7. `https` - `True`, что бы включить режим https
 8. `data` - передаваемые данные для нейронной сети (например, бинарная строка с изображением)
-9. возвращает строку с ответом сервера, либо строку с ошибкой, либо при запросе `lenet status` - `tuple` с точностью обучения сети в % и датой последнего обучения 
+9. возвращает строку с ответом сервера, либо строку с ошибкой (начинается с `[E]`), либо при запросе `lenet status` - `tuple` с точностью обучения сети в % и датой последнего обучения 
     
 Поддерживаемые значения для `name_nn`:
 1. `list_nn` - получить список имеющихся нейронных сетей и их адреса 
@@ -411,6 +411,24 @@ access_to_nn_server(host, port, name_nn, type_operation, login=None, password=No
 
 `data` должна содержать:
 1. Для `lenet classify` - изображение `.jpg/.png/.bmp/.tiff` с рукописной цифрой в виде бинарной строки
+2. В остальных случаях `data` не используется
+
+Пример использования:
+```
+try:
+    result = access_to_nn_server(host, port, name_nn, type_operation, data=img_data)
+except requests.exceptions.RequestException as e:
+    print('\n[E] ' + str(e) + '\n')
+    return
+if isinstance(result, tuple):
+    print('Результат обработки запроса: точность классификации %s%%, дата последнего обучения %s' % (result[0], result[1]))
+elif isinstance(result, list):
+    print('Результат обработки запроса: %s' % result)
+elif result.find('[E]') != -1:
+    print(result)
+else:
+    print('Результат запроса: ' + result)
+```
 
 ---
 
