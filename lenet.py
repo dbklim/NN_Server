@@ -35,7 +35,7 @@ class LeNet:
         self.f_net_weights = f_net_weights
         self.f_test_classification_img = f_test_classification_img
         self.lenet_model = None
-        self.init_classification()        
+        self.__init_classification()        
         self.is_training = False
         
 
@@ -147,11 +147,11 @@ class LeNet:
         model.save_weights(self.f_net_weights)
 
         self.is_training = False
-        self.init_classification()
+        self.__init_classification()
         return (round(scores[1]*100, 2), round((end_time - start_time)/60, 2)) # точность в %, время в минутах
 
 
-    def init_classification(self):
+    def __init_classification(self):
         ''' Загрузка модели сети и её весов, компиляция полученной сети и проверка её работоспособности. '''
         # Загрузка модели из файла
         json_file = open(self.f_net_model, 'r')
