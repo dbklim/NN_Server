@@ -413,10 +413,18 @@ access_to_nn_server(host, port, name_nn, type_operation, login=None, password=No
 1. Для `lenet classify` - изображение `.jpg/.png/.bmp/.tiff` с рукописной цифрой в виде бинарной строки
 2. В остальных случаях `data` не используется
 
-Пример использования:
+Пример использования (подробнее можете посмотреть в `nn_client.py` в функции `main()`):
 ```
+name_nn = 'lenet'
+type_operation = 'classify'
+number_image = '1'
+img_data = None
+if type_operation == 'classify': 
+    img_path = 'images/' + number_image + '.jpg'
+    with open(img_path, 'rb') as f_image:
+        img_data = f_image.read()
 try:
-    result = access_to_nn_server(host, port, name_nn, type_operation, data=img_data)
+    result = access_to_nn_server('127.0.0.1', '5000', name_nn, type_operation, data=img_data)
 except requests.exceptions.RequestException as e:
     print('\n[E] ' + str(e) + '\n')
     return
