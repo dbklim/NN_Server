@@ -392,9 +392,9 @@ def main():
             print('\tбез аргументов - запуск обучения сети на обучающей выборке MNIST')
             print('\ttraining_sample.npz - запуск обучения сети на обучающей выборке training_sample.npz')
             print('\t-c - создать обучающую выборку на основе изображений из data/source_images')
-            print('\t-c my_data/source_images - создать обучающую выборку на основе изображений из my_data/source_images')
+            print('\t-c my_data/images - создать обучающую выборку на основе изображений из my_data/images')
             print('\t-c training_sample.npz - создать обучающую выборку на основе изображений из data/source_images и сохранить в training_sample.npz')
-            print('\t-c my_data/source_images training_sample.npz - создать обучающую выборку на основе изображений из my_data/source_images и сохранить в training_sample.npz\n')
+            print('\t-c my_data/images training_sample.npz - создать обучающую выборку на основе изображений из my_data/images и сохранить в training_sample.npz\n')
         else:
             print("\n[E] Неверный аргумент командной строки '" + sys.argv[1] + "'. Введите help для помощи.\n")
     else:
