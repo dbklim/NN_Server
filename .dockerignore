@@ -1,0 +1,6 @@
+.vscode/
+__pycache__/
+data/source_images/*.jpg
+data/*.png
+data/*.jpg
+test_client.py
