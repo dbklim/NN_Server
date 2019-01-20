@@ -40,11 +40,12 @@ def access_to_nn_server(host, port, name_nn, type_operation, login = None, passw
     Поддерживаемые значения для type_operation:
     1. classify - классифицировать изображение
     2. status - получить статус сети (точность классификации и дата последнего обучения) 
-    3. train - запустить обучение сети (LeNet: на наборе данных MNIST)
+    3. train - запустить обучение сети (LeNet: на наборе данных MNIST или своём предварительно созданном наборе данных)
     4. about - получить информацию о сети
 
     data должна содержать:
-    1. Для lenet classify - изображение .jpg/.png/.bmp/.tiff с рукописной цифрой в виде бинарной строки '''
+    1. Для lenet classify - изображение .jpg/.png/.bmp/.tiff с рукописной цифрой в виде бинарной строки
+    2. Для lenet train - значение mnist (набор данных MNIST) или other (свой предварительно созданный набор данных) для выбора соответствующей обучающей выборки '''
 
     addr = host + ':' + port
     protocol = 'http'
@@ -87,8 +88,10 @@ def access_to_nn_server(host, port, name_nn, type_operation, login = None, passw
                 error = data.get('error')
                 return '[E] ' + error
             return (accuracy, datetime)
-        elif type_operation == 'train': # Запустить обучение сети на наборе данных MNIST
-            response = requests.get(protocol + '://' + addr + '/lenet/train', headers=headers)
+        elif type_operation == 'train': # Запустить обучение сети на наборе данных MNIST или предварительно созданном наборе данных
+            if data == None:
+                return "[E] Argument 'data' is empty!"
+            response = requests.get(protocol + '://' + addr + '/lenet/train?training_sample=' + data, headers=headers)
             data = response.json()
             text = data.get('text')
             if text == None:
@@ -103,6 +106,8 @@ def access_to_nn_server(host, port, name_nn, type_operation, login = None, passw
                 error = data.get('error')
                 return '[E] ' + error
             return text
+        elif type_operation == None:
+            return "[E] Invalid value of argument 'type_operation': None!"
         else:
             return "[E] Invalid value of argument 'type_operation': " + type_operation + '!'
     elif name_nn == 'seq2seq':
@@ -143,14 +148,14 @@ def get_address_on_local_network():
     elif host_172xxx:
         return host_172xxx
     else:
-        print("\n[E] Неподдерживаемый формат локального адреса, требуется корректировка исходного кода.\n")
+        print("\n[E] Неподдерживаемый формат локального адреса, требуется корректировка исходного кода. Выбран адрес 127.0.0.1.\n")
         return '127.0.0.1'
 
 
 def main():
     host = '127.0.0.1'
     port = '5000'
-    img_data = None
+    data = None
     type_operation = None
     name_nn = None
     if len(sys.argv) > 1:
@@ -166,7 +171,7 @@ def main():
                                     img_path = sys.argv[4]
                                     try:
                                         with open(img_path, "rb") as fh:
-                                            img_data = fh.read()
+                                            data = fh.read()
                                     except FileNotFoundError as e:
                                         print('\n[E] ' + str(e) + '\n')
                                         return
@@ -176,8 +181,16 @@ def main():
                             type_operation = sys.argv[3]
                         elif sys.argv[3] == 'status': # Получить статус сети (точность классификации и дата последнего обучения)
                             type_operation = sys.argv[3]
-                        elif sys.argv[3] == 'train': # Запустить обучение сети на наборе данных MNIST
+                        elif sys.argv[3] == 'train': # Запустить обучение сети на наборе данных MNIST или предварительно созданном наборе данных
                             type_operation = sys.argv[3]
+                            if len(sys.argv) > 4:
+                                if sys.argv[4] == 'other':
+                                    data = 'other'
+                                else:
+                                    print("\n[E] Неверный аргумент командной строки '" + sys.argv[4] + "'. Введите help для помощи.\n")
+                                    return
+                            else:
+                                data = 'mnist'
                         elif sys.argv[3] == 'about': # Получить информацию о сети
                             type_operation = sys.argv[3]
                         else:
@@ -203,7 +216,7 @@ def main():
                             img_path = sys.argv[3]
                             try:
                                 with open(img_path, "rb") as fh:
-                                    img_data = fh.read()
+                                    data = fh.read()
                             except FileNotFoundError as e:
                                 print('\n[E] ' + str(e) + '\n')
                                 return
@@ -213,8 +226,16 @@ def main():
                     type_operation = sys.argv[2]
                 elif sys.argv[2] == 'status': # Получить статус сети (точность классификации и дата последнего обучения)
                     type_operation = sys.argv[2]
-                elif sys.argv[2] == 'train': # Запустить обучение сети на наборе данных MNIST
+                elif sys.argv[2] == 'train': # Запустить обучение сети на наборе данных MNIST или предварительно созданном наборе данных
                     type_operation = sys.argv[2]
+                    if len(sys.argv) > 3:
+                        if sys.argv[3] == 'other':
+                            data = 'other'
+                        else:
+                            print("\n[E] Неверный аргумент командной строки '" + sys.argv[3] + "'. Введите help для помощи.\n")
+                            return
+                    else:
+                        data = 'mnist'
                 elif sys.argv[2] == 'about': # Получить информацию о сети
                     type_operation = sys.argv[2]
                 else:
@@ -235,12 +256,14 @@ def main():
             print('\thost:port lenet status - получить статус сети LeNet')
             print('\thost:port lenet about - получить информацию о сети LeNet')
             print('\thost:port lenet train - запустить обучение сети LeNet на наборе данных MNIST')
+            print('\thost:port lenet train other - запустить обучение сети LeNet на предварительно созданном наборе данных')
             print('\tlist_nn - получить список имеющихся нейронных сетей и их адреса')
             print('\tlenet classify - классифицировать изображение с цифрой с помощью сети LeNet (host определяется автоматически, port = 5000)')
             print('\tlenet classify image.jpg - классифицировать image.jpg/.png/.bmp/.tiff с помощью сети LeNet (host определяется автоматически, port = 5000)')
             print('\tlenet status - получить статус сети LeNet (host определяется автоматически, port = 5000)')
             print('\tlenet about - получить информацию о сети LeNet (host определяется автоматически, port = 5000)')
-            print('\tlenet train - запустить обучение сети LeNet на наборе данных MNIST (host определяется автоматически, port = 5000)\n')
+            print('\tlenet train - запустить обучение сети LeNet на наборе данных MNIST (host определяется автоматически, port = 5000)')
+            print('\tlenet train other - запустить обучение сети LeNet на предварительно созданном наборе данных (host определяется автоматически, port = 5000)\n')
             return
         else:
             print("\n[E] Неверный аргумент командной строки '" + sys.argv[1] + "'. Введите help для помощи.\n")
@@ -256,6 +279,7 @@ def main():
         print('\t3. lenet status - получить статус сети LeNet')
         print('\t4. lenet about - получить информацию о сети LeNet')
         print('\t5. lenet train - запустить обучение сети LeNet на наборе данных MNIST')
+        print('\t6. lenet train other - запустить обучение сети LeNet на предварительно созданном наборе данных')
         name_nn = 'lenet'
         while True:
             choice = input('Введите цифру: ')
@@ -264,7 +288,7 @@ def main():
                 break
             elif choice == '2':
                 type_operation = 'classify'
-                if img_data == None:
+                if data == None:
                     for_exit = True
                     while for_exit:
                         number_image = input('Введите номер изображения из директории image с цифрой для распознавания (0..9): ')
@@ -276,9 +300,9 @@ def main():
                             print('Необходимо ввести цифру от 0 до 9!')
                     # Загрузка изображения
                     img_path = 'images/' + number_image + '.jpg'
-                    img_data = None
+                    data = None
                     with open(img_path, 'rb') as f_image:
-                        img_data = f_image.read()
+                        data = f_image.read()
                 break
             elif choice == '3':
                 type_operation = 'status'
@@ -290,11 +314,18 @@ def main():
                 choice = input('Вы уверены?(д/н) ')
                 if choice == 'д' or choice == 'y':
                     type_operation = 'train'
+                    data = 'mnist'
+                break
+            elif choice == '6':
+                choice = input('Вы уверены?(д/н) ')
+                if choice == 'д' or choice == 'y':
+                    type_operation = 'train'
+                    data = 'other'
                 break
             else:
                 os.write(sys.stdout.fileno(), curses.tigetstr('cuu1'))
 
-    if img_data == None and type_operation == 'classify': # Если не был передан адрес изображения
+    if data == None and type_operation == 'classify': # Если не был передан адрес изображения
         for_exit = True
         while for_exit:
             number_image = input('Введите номер изображения из директории image с цифрой для распознавания (0..9): ')
@@ -306,13 +337,13 @@ def main():
                 print('Необходимо ввести цифру от 0 до 9!')
         # Загрузка изображения
         img_path = 'images/' + number_image + '.jpg'
-        img_data = None
+        data = None
         with open(img_path, 'rb') as f_image:
-            img_data = f_image.read()
+            data = f_image.read()
 
     start_time = time.time()
     try:
-        result = access_to_nn_server(host, port, name_nn, type_operation, data=img_data)
+        result = access_to_nn_server(host, port, name_nn, type_operation, data=data)
     except requests.exceptions.RequestException as e:
         print('\n[E] ' + str(e) + '\n')
         return

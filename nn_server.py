@@ -89,7 +89,8 @@ dictConfig({
 app = Flask(__name__)
 auth = HTTPBasicAuth()
 max_content_length = 16 * 1024 * 1024
-f_source_data = 'data/mnist.npz'
+f_training_sample_mnist = 'data/mnist.npz'
+f_training_sample = 'data/training_sample.npz'
 f_net_model = 'data/lenet_model.json'
 f_net_weights = 'data/lenet_weights.h5'
 f_datetime_training_networks = 'data/last_datetime_training_networks.txt'
@@ -141,8 +142,10 @@ http_server = None
 graph = get_default_graph()
 
 
-def train_nn():
-    ''' Выполняет обучение сети с перенаправлением всего вывода в файл log/train.log. Выполняется в отдельном потоке. '''
+def train_nn(f_source_data):
+    ''' Выполняет обучение сети с перенаправлением всего вывода в файл log/train.log. Выполняется в отдельном потоке.
+    1. f_source_data - имя .npz файла с обучающей выборкой '''
+
     log('запущено обучение сети')
     global result_train_lenet
     in_terminal = sys.stdout
@@ -220,19 +223,42 @@ def lenet_about():
 @app.route('/lenet/train', methods=['GET', 'POST'])
 @auth.login_required
 def lenet_train():
-    ''' GET-запрос инициирует обучение сети LeNet на наборе рукописных цифр MNIST. '''
+    ''' GET-запрос инициирует обучение сети LeNet на наборе рукописных цифр MNIST или предварительно созданном наборе данных. '''
     if request.method == 'GET':
+        training_sample_option = request.args.get('training_sample')
+        if training_sample_option == None:
+            log('запрос не содержит обязательный параметр в URL', request.remote_addr, 'error')
+            return make_response(jsonify({'error': 'The request does not contain a required parameter in the URL.'}), 400)
         global thread_for_train
+
         if thread_for_train == None:
-            thread_for_train = threading.Thread(target=train_nn, daemon=True)
-            thread_for_train.start()
-            log('запуск обучения модели LeNet на наборе рукописных цифр MNIST', request.remote_addr)
-            return jsonify({'text':'Запущено обучение сети.'})
+            if training_sample_option == 'mnist':
+                thread_for_train = threading.Thread(target=train_nn, kwargs={'f_source_data':f_training_sample_mnist}, daemon=True)
+                thread_for_train.start()
+                log('запуск обучения модели LeNet на наборе рукописных цифр MNIST', request.remote_addr)
+                return jsonify({'text':'Запущено обучение сети.'})
+            elif training_sample_option == 'other':
+                thread_for_train = threading.Thread(target=train_nn, kwargs={'f_source_data':f_training_sample}, daemon=True)
+                thread_for_train.start()
+                log('запуск обучения модели LeNet на предварительно созданном наборе данных', request.remote_addr)
+                return jsonify({'text':'Запущено обучение сети.'})
+            else:
+                log("неподдерживаемое значение параметра 'training_sample'", request.remote_addr, 'error')
+                return make_response(jsonify({'error': "The parameter 'training_sample' has an unsupported value."}), 400)
+
         elif thread_for_train.isAlive() == False:
-            thread_for_train = threading.Thread(target=train_nn, daemon=True)
-            thread_for_train.start()
-            log('запуск обучения модели LeNet на наборе рукописных цифр MNIST', request.remote_addr)
-            return jsonify({'text':'Запущено обучение сети.'})
+            if training_sample_option == 'mnist':
+                thread_for_train = threading.Thread(target=train_nn, kwargs={'f_source_data':f_training_sample_mnist}, daemon=True)
+                log('запуск обучения модели LeNet на наборе рукописных цифр MNIST', request.remote_addr)
+                return jsonify({'text':'Запущено обучение сети.'})
+            elif training_sample_option == 'other':
+                thread_for_train = threading.Thread(target=train_nn, kwargs={'f_source_data':f_training_sample}, daemon=True)
+                thread_for_train.start()
+                log('запуск обучения модели LeNet на предварительно созданном наборе данных', request.remote_addr)
+                return jsonify({'text':'Запущено обучение сети.'})
+            else:
+                log("неподдерживаемое значение параметра 'training_sample'", request.remote_addr, 'error')
+                return make_response(jsonify({'error': "The parameter 'training_sample' has an unsupported value."}), 400)
         else:
             log('обучение сети ещё не завершено', request.remote_addr)
             return make_response(jsonify({'error':'Network training is not yet complete.'}), 406)
@@ -285,7 +311,7 @@ def lenet_classify():
 # Всего 5 запросов:
 # 1. GET-запрос на /list_nn вернёт информацию об имеющихся нейронных сетях и их адресах
 # 2. GET-запрос на /lenet/about вернёт информацию о сети LeNet
-# 3. GET-запрос на /lenet/train запустит обучение сети на наборе рукописных цифр MNIST
+# 3. GET-запрос на /lenet/train запустит обучение сети на наборе рукописных цифр MNIST или на своём предварительно созданном наборе данных
 # 4. GET-запрос на /lenet/train/status вернёт последний результат обучения сети LeNet
 # 5. POST-запрос на /lenet/classify принимает .jpg/.png/.bmp/.tiff файл и возвращает распознанную цифру в виде строки
 
@@ -383,9 +409,10 @@ def get_address_on_local_network():
     elif host_172xxx:
         return host_172xxx
     else:
-        print("\n[E] Неподдерживаемый формат локального адреса, требуется корректировка исходного кода.\n")
+        print("\n[E] Неподдерживаемый формат локального адреса, требуется корректировка исходного кода. Выбран адрес 127.0.0.1.\n")
         return '127.0.0.1'
 
+# Добавить приём обучающей выборки и её обработку 
 
 def main():
     host = '127.0.0.1'
