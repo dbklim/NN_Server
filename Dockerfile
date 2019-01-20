@@ -2,9 +2,15 @@ FROM ubuntu:16.04
 MAINTAINER Vlad Klim 'vladsklim@gmail.com'
 
 # Установка необходимых пакетов для Ubuntu
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -y
-RUN apt-get install -y build-essential python3.5 python3.5-dev python3-pip python3-tk locales locales-all net-tools
+RUN apt-get install -y tzdata python3.5 python3.5-dev python3-pip python3-tk locales locales-all net-tools
 RUN ldconfig
+
+# Установка часового пояса хост-машины
+ENV TZ=Europe/Minsk
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+RUN dpkg-reconfigure -f noninteractive tzdata
 
 # Копирование файлов проекта
 COPY . /NN_Server
@@ -20,9 +26,6 @@ RUN locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
-
-# Что бы не сбивалось время в логах после перезагрузки хост-машины
-RUN timedatectl set-local-rtc 1 --adjust-system-clock
 
 # Очистка кеша
 RUN apt-get -y autoremove

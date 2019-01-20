@@ -268,6 +268,10 @@ class LeNet:
         2. f_training_sample - имя .npz файла, в который будет сохранена полученная обучающая выборка '''
         curses.setupterm()
 
+        if os.path.exists(folder_source_images) == False:
+            print('[E] Папка %s не существует!' % folder_source_images)
+            return
+
         # Получение имён всех изображений, находящихся в folder_source_images    
         print('[i] Поиск изображений для создания обучающей выборки в %s' % folder_source_images)
         f_names_source_images = sorted(os.listdir(path=folder_source_images))
