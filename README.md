@@ -112,7 +112,7 @@ sudo docker run -ti --rm -p 5000:5000 nn_server:v0.1 python3 nn_server.py
 Всего поддерживается 5 запросов:
 1. GET-запрос на `/list_nn` вернёт информацию об имеющихся нейронных сетях и их адресах
 2. GET-запрос на `/lenet/about` вернёт информацию о сети LeNet
-3. GET-запрос на `/lenet/train` запустит обучение сети в фоне (т.е. в отдельном потоке) на наборе рукописных цифр MNIST (после запуска, на запросы 3, 4 и 5 сервер будет отвечать ошибкой с пояснением, что сеть на данный момент обучается и недоступна для использования)
+3. GET-запрос на `/lenet/train` запустит обучение сети в фоне (т.е. в отдельном потоке) на наборе рукописных цифр MNIST (передать в URL параметр `training_sample=mnist`) или на предварительно созданном наборе данных `data/training_sample.npz` (передать в URL параметр `training_sample=other`) (после запуска, на запросы 3, 4 и 5 сервер будет отвечать ошибкой с пояснением, что сеть на данный момент обучается и недоступна для использования)
 4. GET-запрос на `/lenet/train/status` вернёт последний результат обучения сети LeNet (точность классификации и дата последнего обучения)
 5. POST-запрос на `/lenet/classify` принимает .jpg/.png/.bmp/.tiff файл и возвращает распознанную цифру в виде строки
 
@@ -134,7 +134,18 @@ headers = {'Authorization' : "Basic " + auth.decode()}
 Authorization: Basic dGVzdF9ubjpsZW5ldA==
 ```
 
-2. В запросе на классификацию (который под номером 5) сервер ожидает .jpg/.png/.bmp/.tiff файл (цветной либо чёрно-белый, размером от 28х28 пикселей) с изображением рукописной цифры (цифра должна занимать большую часть изображения, примеры можно найти в `images/*.jpg`), который передаётся в json с помощью кодировки `base64` (т.е. открывается .jpg/.png/.bmp/.tiff файл, читается в массив байт, потом кодирутеся `base64`, полученный массив декодируется из байтовой формы в строку `utf-8` и помещается в json), в python это выглядит так:
+2. В запросе на запуск обучения сети (который под номером 3) сервер ожидает параметр `training_sample` в URL запроса. Данный параметр определят используемую обучающую выборку: `training_sample=mnist` - использовать в качестве обучающей выборки набор рукописных цифр MNIST, `training_sample=other` - использовать предварительно созданную обучающую выборку `data/training_sample.npz` из своих данных (с помощью `lenet.py -c`). Пример на python:
+```
+# Отправка запроса серверу
+response = requests.post('http://' + addr + '/lenet/train?training_sample=mnist', headers=headers, json=data)
+
+# Разбор ответа
+data = response.json()
+number = data.get('number')
+print(number)
+```
+
+3. В запросе на классификацию (который под номером 5) сервер ожидает .jpg/.png/.bmp/.tiff файл (цветной либо чёрно-белый, размером от 28х28 пикселей) с изображением рукописной цифры (цифра должна быть на светлом (в идеале - белом) фоне, примеры можно найти в `images/*.jpg`), который передаётся в json с помощью кодировки `base64` (т.е. открывается .jpg/.png/.bmp/.tiff файл, читается в массив байт, потом кодирутеся `base64`, полученный массив декодируется из байтовой формы в строку `utf-8` и помещается в json), в python это выглядит так:
 ```
 # Формирование запроса
 auth = base64.b64encode('test_nn:lenet'.encode())
@@ -205,7 +216,7 @@ print(number)
 'error': 'Unauthorized access.'
 }
 ```
-Переопределены следующие коды ответов: 400, 401, 404, 405, 406, 415, 500
+Переопределены следующие коды ответов: 400, 401, 404, 405, 406, 415, 500.
 
 ---
 
@@ -285,7 +296,7 @@ Date: Fri, 21 Nov 2018 15:43:06 GMT
 
 Пример запроса, который формирует `python-requests`:
 ```
-GET /lenet/train HTTP/1.1
+GET /lenet/train?training_sample=mnist HTTP/1.1
 Host: 192.168.2.83:5000
 Authorization: Basic dGVzdF9ubjpsZW5ldA==
 User-Agent: python-requests/2.9.1
@@ -293,9 +304,9 @@ Connection: keep-alive
 Accept-Encoding: gzip, deflate
 ```
 
-Пример запроса, который формирует curl (`curl -v -u test_nn:lenet -i http://192.168.2.83:5000/lenet/train`):
+Пример запроса, который формирует curl (`curl -v -u test_nn:lenet -i http://192.168.2.83:5000/lenet/train?training_sample=other`):
 ```
-GET /lenet/train HTTP/1.1
+GET /lenet/train?training_sample=other HTTP/1.1
 Host: 192.168.2.83:5000
 Authorization: Basic dGVzdF9ubjpsZW5ldA==
 User-Agent: curl/7.47.0
@@ -417,7 +428,30 @@ Content-Type: application/json
 7. Полносвязный выходной слой: 10 нейронов, которые соответствуют классам рукописных цифр от 0 до 9, функция активации `SoftMax`
 При обучении ипользовался оптимизатор `adam` и метод вычисления значения функции потери `categorical_crossentropy`. Проблема переобучения решается с помощью промежуточных слоёв `Dropout`. Точность классификации после 10 эпох обучения варьируется от 99.3% до 99.7%.
 
-Реализация находится в модуле `lenet.py`. Он представляет собой класс `LeNet` с двумя public-методами: `train()` и `classify()`. Модель обученной сети и её веса находятся в `data/lenet_model.json` и `data/lenet_weights.h5`. Набор данных для обучения - в `data/mnist.npz`.
+Реализация находится в модуле `lenet.py`. Он представляет собой класс `LeNet` с тремя public-методами: `train()`, `classify()` и `create_training_sample()`. Модель обученной сети и её веса находятся в `data/lenet_model.json` и `data/lenet_weights.h5`. Набор данных для обучения - в `data/mnist.npz` и/или `data/training_sample.npz`.
+
+---
+
+Так же данный класс поддерживает создание обучающей выборки на основе любых изображений цифр. Реализация находится в методе `create_training_sample()`.
+
+Изображения должны быть в формате .jpg/.png/.bmp/.tiff, цветные и/или чёрно-белые, размером от 28х28 пикселей. На одном изображении может быть только одна цифра на светлом (в идеале - белом) фоне (примеры можно найти в `images/*.jpg`). Каждое изображение в своём имени должно содержать метку класса (т.е. цифру, которая на изображении; метка определяется по первому символу в названии). Например: `0_1399.jpg` - на изображении цифра 0; `7_81491.jpg` - на изображении цифра 7.
+
+При создании обучающей выборки над каждым изображением выполняются следующие преобразования (которые так же выполняются для изображения, которое передаётся в параметрах методу `classify()`):
+  - конвертирование в чёрно-белое;
+  - обрезание всех светлых/белых рамок/полос так, что бы цифра занимала полностью всё изображение;
+  - выранивание длины и ширины (по максимальному из них);
+  - добавление белой рамки шириной 3 пикселя;
+  - уменьшение размера до 28х28 пикселей (как у изображений из набора данных MNIST)
+  - инвертирование цвета.
+
+Для удобства создания своей обучающей выборки, модуль `lenet.py` поддерживает аргументы командной строки (так же вы можете просто импортировать его в свой код на python и легко использовать). Список возможных комбинаций аргументов командной строки и их описание: 
+1. без аргументов - запуск обучения сети на обучающей выборке MNIST. Например: ```python3 lenet.py```
+2. `training_sample.npz` - запуск обучения сети на обучающей выборке `training_sample.npz`. Например: ```python3 lenet.py data/training_sample.npz```
+3. `-c` - создать обучающую выборку на основе изображений из `data/source_images`. Например: ```python3 lenet.py -c```
+4. `-c my_data/images` - создать обучающую выборку на основе изображений из `my_data/images`. Например: ```python3 lenet.py -c my_data/images```
+5. `-c training_sample.npz` - создать обучающую выборку на основе изображений из `data/source_images` и сохранить в `training_sample.npz`. Например: ```python3 lenet.py -c training_sample.npz```
+6. `-c my_data/images training_sample.npz` - создать обучающую выборку на основе изображений из `my_data/images` и сохранить в `training_sample.npz`. Например: ```python3 lenet.py -c my_data/images training_sample.npz```
+
 
 # Клиент для общения с RESTful сервером
 
@@ -453,12 +487,14 @@ Content-Type: application/json
 6. `host:port lenet status` - получить статус сети LeNet. Например: `python3 nn_client.py 192.168.2.102:5000 lenet status`
 7. `host:port lenet about` - получить информацию о сети LeNet. Например: `python3 nn_client.py 192.168.2.102:5000 lenet status`
 8. `host:port lenet train` - запустить обучение сети LeNet на наборе данных MNIST. Например: `python3 nn_client.py 192.168.2.102:5000 lenet train`
-9. `list_nn` - получить список имеющихся нейронных сетей и их адреса. Например: `python3 nn_client.py list_nn`
-10. `lenet classify` - классифицировать изображение с цифрой с помощью сети LeNet (`host` определяется автоматически, `port = 5000`). Например: `python3 nn_client.py lenet classify`
-11. `lenet classify image.jpg` - классифицировать `image.jpg/.png/.bmp/.tiff` с помощью сети LeNet (`host` определяется автоматически, `port = 5000`). Например: `python3 nn_client.py lenet classify my_folder/my_number.jpg`
-12. `lenet status` - получить статус сети LeNet (`host` определяется автоматически, `port = 5000`). Например: `python3 nn_client.py lenet status`
-13. `lenet about` - получить информацию о сети LeNet (`host` определяется автоматически, `port = 5000`). Например: `python3 nn_client.py lenet about`
-14. `lenet train` - запустить обучение сети LeNet на наборе данных MNIST (`host` определяется автоматически, `port = 5000`). Например: `python3 nn_client.py lenet train`
+9. `host:port lenet train other` - запустить обучение сети LeNet на предварительно созданном наборе данных. Например: `python3 nn_client.py 192.168.2.102:5000 lenet train other`
+10. `list_nn` - получить список имеющихся нейронных сетей и их адреса. Например: `python3 nn_client.py list_nn`
+11. `lenet classify` - классифицировать изображение с цифрой с помощью сети LeNet (`host` определяется автоматически, `port = 5000`). Например: `python3 nn_client.py lenet classify`
+12. `lenet classify image.jpg` - классифицировать `image.jpg/.png/.bmp/.tiff` с помощью сети LeNet (`host` определяется автоматически, `port = 5000`). Например: `python3 nn_client.py lenet classify my_folder/my_number.jpg`
+13. `lenet status` - получить статус сети LeNet (`host` определяется автоматически, `port = 5000`). Например: `python3 nn_client.py lenet status`
+14. `lenet about` - получить информацию о сети LeNet (`host` определяется автоматически, `port = 5000`). Например: `python3 nn_client.py lenet about`
+15. `lenet train` - запустить обучение сети LeNet на наборе данных MNIST (`host` определяется автоматически, `port = 5000`). Например: `python3 nn_client.py lenet train`
+16. `lenet train other` - запустить обучение сети LeNet на предварительно созданном наборе данных (`host` определяется автоматически, `port = 5000`). Например: `python3 nn_client.py lenet train other`
             
 ---
 
@@ -487,25 +523,26 @@ access_to_nn_server(host, port, name_nn, type_operation, login=None, password=No
 Поддерживаемые значения для `type_operation`:
 1. `classify` - классифицировать изображение
 2. `status` - получить статус сети (точность классификации и дата последнего обучения) 
-3. `train` - запустить обучение сети (LeNet: на наборе данных MNIST)
+3. `train` - запустить обучение сети (LeNet: на наборе данных MNIST или своём предварительно созданном наборе данных)
 4. `about` - получить информацию о сети
 
 `data` должна содержать:
 1. Для `lenet classify` - изображение `.jpg/.png/.bmp/.tiff` с рукописной цифрой в виде бинарной строки
-2. В остальных случаях `data` не используется
+2. Для `lenet train` - значение `mnist` (набор данных MNIST) или `other` (свой предварительно созданный набор данных) для выбора соответствующей обучающей выборки
+3. В остальных случаях `data` не используется
 
 Пример использования (подробнее можете посмотреть в `nn_client.py` в функции `main()`):
 ```
 name_nn = 'lenet'
 type_operation = 'classify'
 number_image = '1'
-img_data = None
+data = None
 if type_operation == 'classify': # Если выбрана классификация, будет загружено изображение цифры 1
     img_path = 'images/' + number_image + '.jpg'
     with open(img_path, 'rb') as f_image:
-        img_data = f_image.read()
+        data = f_image.read()
 try:
-    result = access_to_nn_server('127.0.0.1', '5000', name_nn, type_operation, data=img_data)
+    result = access_to_nn_server('127.0.0.1', '5000', name_nn, type_operation, data=data)
 except requests.exceptions.RequestException as e: # Если возникла ошибка при отправке/получении запроса/ответа
     print('\n[E] ' + str(e) + '\n')
     return
