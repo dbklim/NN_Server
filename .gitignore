@@ -6,3 +6,4 @@ data/*.jpg
 data/source_images/*.jpg
 test_client.py
 Команды для Docker.txt
+*.tar
