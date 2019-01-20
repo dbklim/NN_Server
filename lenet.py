@@ -9,13 +9,15 @@
 '''
 
 import sys
+import os
 import numpy
 import time
+import curses
 from PIL import Image as pilImage
 from io import BytesIO
 import tensorflow
 from keras.models import model_from_json
-from keras.preprocessing import image
+from keras.preprocessing import image as image_preproc
 from keras.datasets import mnist
 from keras.models import Sequential, model_from_json
 from keras.layers import Dense, Dropout, Flatten
@@ -35,15 +37,16 @@ class LeNet:
         self.f_net_weights = f_net_weights
         self.f_test_classification_img = f_test_classification_img
         self.lenet_model = None
-        self.__init_classification()        
+        if os.path.exists(f_net_model) and os.path.exists(f_net_weights) and os.path.exists(f_test_classification_img):
+            self.__init_classification()
         self.is_training = False
         
 
-    def train(self, f_source_data, for_out_in_file = False):
-        ''' Обучение сети на наборе рукописных цифр MNIST с параметрами по умолчанию. 
+    def train(self, f_source_data, for_out_in_file=False):
+        ''' Обучение сети на наборе рукописных цифр f_source_data с параметрами по умолчанию. 
         1. f_source_data - имя .npz файла с обучающей выборкой
-        2. for_out_in_file - изменяет вывод при обучении модели для удобства записи в файл 
-        3. возвращает строку с точностью классификации на тестовых данных из MNIST и затраченное на обучение время '''       
+        2. for_out_in_file - изменяет вывод при обучении модели для удобства записи в файл
+        4. возвращает строку с точностью классификации на тестовых данных и затраченное на обучение время '''       
         
         self.is_training = True
 
@@ -59,8 +62,7 @@ class LeNet:
         f.close()
         
         print('[i] Подготовка обучающей выборки...')
-        # Добавление всех изображений в один массив
-        # n x m x p x k, где n - номер изображения, m - столбец в изображении, p - строка в изображении, k - интенсивность цвета пикселя (0..255) 
+        # Помещает значение интенсивности цвета каждого пикселя каждого изображения в отдельные массивы 
         x_train = x_train.reshape(x_train.shape[0], img_width, img_height, 1)
         x_test = x_test.reshape(x_test.shape[0], img_width, img_height, 1)
         input_shape = (img_width, img_height, 1)
@@ -172,7 +174,7 @@ class LeNet:
         image_for_classification.thumbnail((28, 28), pilImage.ANTIALIAS)
 
         # Преобразование изображения в массив numpy
-        x = image.img_to_array(image_for_classification)
+        x = image_preproc.img_to_array(image_for_classification)
         
         # Инвертирование цвета и нормализация
         x = 255 - x
@@ -191,35 +193,62 @@ class LeNet:
     def classify(self, image_for_classification):
         ''' Классификация изображения с помощью заранее обученной сети.
         1. image_for_classification - .jpg/.png/.bmp/.tiff файл с изображением цифры в виде бинарной строки
-        2. возвращает строку с распознанной цифрой или: error_1 - если выполняется обучение сети, error_2 - если что-то не так с изоражением '''
+        2. возвращает строку с распознанной цифрой или: error_1 - если выполняется обучение сети, eror_2 - если не найдены файлы с обученной сетью, error_3 - если что-то не так с изоражением '''
         
         if self.is_training == True:
             return 'error_1'
+            
+        if self.lenet_model == None:
+            return 'error_2'
         
         try:
             # Преобразование бинарной строки в PIL Image
             stream = BytesIO(image_for_classification)
-            image_for_classification = pilImage.open(stream)
+            image = pilImage.open(stream)
+
+            # Конвертирование изображения в чёрно-белое и сохранение значений цвета каждого пикселя в массив numpy
+            image = image.convert('L')
+            image = numpy.array(image)
+
+            # Удаление белых прямоугольников сверху и снизу изображения
+            i = 0
+            while i < image.shape[0]:
+                if all(image[i] > 230):
+                    image = numpy.delete(image, i, axis=0)
+                else:
+                    i += 1
+
+            # Удаление белых прямоугольников слева и справа изображения
+            i = 0
+            while i < image.shape[1]:
+                if all(image[:,i] > 230):
+                    image = numpy.delete(image, i, axis=1)
+                else:
+                    i += 1
+            image = pilImage.fromarray(image)
 
             # Если изображение прямоугольное, то преобразование его в квадратное
-            width, height = image_for_classification.size
+            width, height = image.size
             if width > height:
-                background = pilImage.new('RGB', (width, width), (255, 255, 255))
-                background.paste(image_for_classification, (0, (width - height) // 2))
-                image_for_classification = background
+                background = pilImage.new('L', (width, width), (255))
+                background.paste(image, (0, (width - height) // 2))
+                image = background
             elif width < height:
-                background = pilImage.new('RGB', (height, height), (255, 255, 255))
-                background.paste(image_for_classification, ((height - width) // 2, 0))
-                image_for_classification = background
+                background = pilImage.new('L', (height, height), (255))
+                background.paste(image, ((height - width) // 2, 0))
+                image = background
 
-            # Преобразование изображение в чёрно-белое и уменьшение размера до 28х28
-            image_for_classification = image_for_classification.convert('L')
-            image_for_classification.thumbnail((28, 28), pilImage.ANTIALIAS)
+            # Уменьшение разрешения до 28х28 пикселей и добавление белой рамки шириной 3 пикселя
+            image.thumbnail((28, 28), pilImage.ANTIALIAS)
+            background = pilImage.new('L', (28+6, 28+6), (255))
+            background.paste(image, (3, 3))
+            image = background
+            image.thumbnail((28, 28), pilImage.ANTIALIAS)
         except Exception:
-            return 'error_2'
+            return 'error_3'
 
-        # Преобразование изображения в массив numpy
-        x = image.img_to_array(image_for_classification)
+        # Преобразование изображения в массив numpy по правилам keras
+        x = image_preproc.img_to_array(image)
         
         # Инвертирование цвета и нормализация
         x = 255 - x
@@ -231,16 +260,146 @@ class LeNet:
         classified_digit = int(numpy.argmax(categories))
         return str(classified_digit)
 
+    
+    def create_training_sample(self, folder_source_images, f_training_sample='data/training_sample.npz'):
+        ''' Создание обучающей выборки из набора изображений .jpg/.png/.bmp/.tiff. Изображения в своих именах должны содержать метку класса.
+        Например: 0_1399.jpg - на изображении цифра 0; 7_81491.jpg - на изображении цифра 7
+        1. folder_source_images - имя папки с изображениями
+        2. f_training_sample - имя .npz файла, в который будет сохранена полученная обучающая выборка '''
+        curses.setupterm()
+
+        # Получение имён всех изображений, находящихся в folder_source_images    
+        print('[i] Поиск изображений для создания обучающей выборки в %s' % folder_source_images)
+        f_names_source_images = sorted(os.listdir(path=folder_source_images))
+        if len(f_names_source_images) == 0:
+            print('[E] Изображения не найдены!')
+            return
+        print('[i] Найдено %i изображений(-е)' % len(f_names_source_images))
+        folder_source_images += '/'
+
+        print('[i] Обработка изображений...')
+        source_images = []
+        classes = []
+        k = 0
+        for f_name_source_image in f_names_source_images:
+            if k % 100 == 0 or k == len(f_names_source_images) - 1:
+                os.write(sys.stdout.fileno(), curses.tigetstr('cuu1'))
+                print('[i] Обработка изображений... %i из %i' % (k, len(f_names_source_images)))
+            image = pilImage.open(folder_source_images + f_name_source_image)
+
+            # Конвертирование изображения в чёрно-белое и сохранение значений цвета каждого пикселя в массив numpy
+            image = image.convert('L')
+            image = numpy.array(image)
+
+            # Удаление белых прямоугольников сверху и снизу изображения
+            i = 0
+            while i < image.shape[0]:
+                if all(image[i] > 230):
+                    image = numpy.delete(image, i, axis=0)
+                else:
+                    i += 1
+
+            # Удаление белых прямоугольников слева и справа изображения
+            i = 0
+            while i < image.shape[1]:
+                if all(image[:,i] > 230):
+                    image = numpy.delete(image, i, axis=1)
+                else:
+                    i += 1
+            image = pilImage.fromarray(image)
+
+            # Если изображение прямоугольное, то преобразование его в квадратное
+            width, height = image.size
+            if width > height:
+                background = pilImage.new('L', (width, width), (255))
+                background.paste(image, (0, (width - height) // 2))
+                image = background
+            elif width < height:
+                background = pilImage.new('L', (height, height), (255))
+                background.paste(image, ((height - width) // 2, 0))
+                image = background
+
+            # Уменьшение разрешения до 28х28 пикселей и добавление белой рамки шириной 3 пикселя
+            image.thumbnail((28, 28), pilImage.ANTIALIAS)
+            background = pilImage.new('L', (28+6, 28+6), (255))
+            background.paste(image, (3, 3))
+            image = background
+            image.thumbnail((28, 28), pilImage.ANTIALIAS)
+
+            # Инвертирование цвета (что бы получить белые цифры на чёрном фоне)        
+            image = numpy.array(image)
+            image = 255 - image        
+
+            source_images.append(image)
+            
+            # Сохранение меток изображений (т.е. какие цифры на них изображены)
+            label = f_name_source_image[0]
+            classes.append(label)
+            k += 1
+
+        # Перемешивание полученной обучающей выборки
+        dataset = [ [source_images, classes] for source_images, classes in zip(source_images, classes) ]
+        numpy.random.shuffle(dataset)
+        source_images = [ source_images for [source_images, classes] in dataset ]
+        classes = [ classes for [source_images, classes] in dataset ]
+        
+        print('[i] Сохранение в %s' % f_training_sample)
+        source_images = numpy.array(source_images)
+        classes = numpy.array(classes)
+        numpy.savez_compressed(f_training_sample, x_train=source_images[:int(source_images.shape[0]*0.8)], y_train=classes[:int(classes.shape[0]*0.8)], 
+                                x_test=source_images[int(source_images.shape[0]*0.8):], y_test=classes[int(classes.shape[0]*0.8):])
+
 
 
 
 def main():
-    f_source_data = 'data/mnist.npz'
+    f_training_sample_mnist = 'data/mnist.npz'
     f_net_model = 'data/lenet_model.json'
     f_net_weights = 'data/lenet_weights.h5'
     f_test_classification_img = 'images/test_classification.jpg'
-    lenet = LeNet(f_net_model, f_net_weights, f_test_classification_img)
-    lenet.train(f_source_data)
+    folder_source_images = 'data/source_images'
+    f_training_sample = 'data/training_sample.npz'
+
+    #lenet = LeNet(f_net_model, f_net_weights, f_test_classification_img)    
+    #lenet.train(f_training_sample)
+
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '-c':
+            if len(sys.argv) > 2:
+                if os.path.exists(sys.argv[2]) and sys.argv[2].find('.npz') == -1:
+                    if len(sys.argv) > 3:
+                        if sys.argv[3].find('.npz') != -1:
+                            lenet = LeNet(f_net_model, f_net_weights, f_test_classification_img) 
+                            lenet.create_training_sample(sys.argv[2], sys.argv[3])
+                        else:
+                            print("\n[E] Неверный аргумент командной строки '" + sys.argv[3] + "'. Введите help для помощи.\n")
+                    else:
+                        lenet = LeNet(f_net_model, f_net_weights, f_test_classification_img) 
+                        lenet.create_training_sample(sys.argv[2])
+                elif sys.argv[2].find('.npz') != -1:
+                    lenet = LeNet(f_net_model, f_net_weights, f_test_classification_img) 
+                    lenet.create_training_sample(folder_source_images, sys.argv[2])
+                else:
+                    print("\n[E] Неверный аргумент командной строки '" + sys.argv[2] + "'. Введите help для помощи.\n")
+            else:
+                lenet = LeNet(f_net_model, f_net_weights, f_test_classification_img) 
+                lenet.create_training_sample(folder_source_images)
+        elif os.path.exists(sys.argv[1]) and sys.argv[1].find('.npz') != -1:
+            lenet = LeNet(f_net_model, f_net_weights, f_test_classification_img) 
+            lenet.train(f_training_sample)
+        elif sys.argv[1] == 'help':
+            print('\nПоддерживаемые варианты работы:')
+            print('\tбез аргументов - запуск обучения сети на обучающей выборке MNIST')
+            print('\ttraining_sample.npz - запуск обучения сети на обучающей выборке training_sample.npz')
+            print('\t-c - создать обучающую выборку на основе изображений из data/source_images')
+            print('\t-c my_data/source_images - создать обучающую выборку на основе изображений из my_data/source_images')
+            print('\t-c training_sample.npz - создать обучающую выборку на основе изображений из data/source_images и сохранить в training_sample.npz')
+            print('\t-c my_data/source_images training_sample.npz - создать обучающую выборку на основе изображений из my_data/source_images и сохранить в training_sample.npz\n')
+        else:
+            print("\n[E] Неверный аргумент командной строки '" + sys.argv[1] + "'. Введите help для помощи.\n")
+    else:
+        lenet = LeNet(f_net_model, f_net_weights, f_test_classification_img) 
+        lenet.train(f_training_sample_mnist)
 
 
 if __name__ == '__main__':
