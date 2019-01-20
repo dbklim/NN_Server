@@ -1,3 +1,8 @@
 .vscode/
 __pycache__/
 log/
+data/*.png
+data/*.jpg
+data/source_images/*.jpg
+test_client.py
+Команды для Docker.txt
